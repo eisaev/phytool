@@ -75,6 +75,51 @@ static int __phy_op(const struct loc *loc, uint16_t *val, int cmd)
 	return 0;
 }
 
+uint32_t phy_read32(const struct loc *loc)
+{
+	uint16_t val1 = 0;
+	uint16_t val2 = 0;
+	uint32_t regaddr = loc->reg;
+	struct loc loc_tmp = *loc;
+
+	regaddr >>= 1;
+	uint16_t r1 = regaddr & 0x1e;
+
+	regaddr >>= 5;
+	uint16_t r2 = regaddr & 0x7;
+
+	regaddr >>= 3;
+	uint16_t page = regaddr & 0x3ff;
+
+	loc_tmp.phy_id = 0x18;
+	loc_tmp.reg = 0;
+	int err = __phy_op(&loc_tmp, &page, SIOCSMIIREG);
+
+	if (err) {
+		fprintf(stderr, "error: phy_write(%d)\n", err);
+		return err;
+	}
+
+	loc_tmp.phy_id = 0x10 | r2;
+	loc_tmp.reg = r1;
+	err = __phy_op(&loc_tmp, &val1, SIOCGMIIREG);
+
+	if (err) {
+		fprintf(stderr, "error: phy_read (%d)\n", err);
+		return err;
+	}
+
+	loc_tmp.reg += 1;
+	err = __phy_op(&loc_tmp, &val2, SIOCGMIIREG);
+
+	if (err) {
+		fprintf(stderr, "error: phy_read (%d)\n", err);
+		return err;
+	}
+
+	return (val2 << 16) | val1;
+}
+
 int phy_read(const struct loc *loc)
 {
 	uint16_t val = 0;
@@ -333,6 +378,27 @@ fallback:
 	return phytool_parse_loc_segs(dev, addr, reg, loc);
 }
 
+static int phytool_read32(struct applet *a, int argc, char **argv)
+{
+	struct loc loc;
+	uint32_t val;
+
+	if (!argc)
+		return 1;
+
+	if (a->parse_loc(argv[0], &loc, 1)) {
+		fprintf(stderr, "error: bad location format\n");
+		return 1;
+	}
+
+	val = phy_read32(&loc);
+	if (val < 0)
+		return 1;
+
+	printf("%#.8x\n", val);
+	return 0;
+}
+
 static int phytool_read(struct applet *a, int argc, char **argv)
 {
 	struct loc loc;
@@ -493,7 +559,9 @@ int main(int argc, char **argv)
 	if (argc < 2)
 		return a->usage(1);
 
-	if (!strcmp(argv[1], "read"))
+	if (!strcmp(argv[1], "read32"))
+		return phytool_read32(a, argc - 2, &argv[2]);
+	else if (!strcmp(argv[1], "read"))
 		return phytool_read(a, argc - 2, &argv[2]);
 	else if (!strcmp(argv[1], "write"))
 		return phytool_write(a, argc - 2, &argv[2]);

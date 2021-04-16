@@ -42,9 +42,10 @@ static inline int loc_c45_port(const struct loc *loc)
 	return (loc->phy_id & MDIO_PHY_ID_PRTAD) >> 5;
 }
 
-int      phy_read (const struct loc *loc);
-int      phy_write(const struct loc *loc, uint16_t val);
-uint32_t phy_id   (const struct loc *loc);
+uint32_t phy_read32(const struct loc *loc);
+int      phy_read  (const struct loc *loc);
+int      phy_write (const struct loc *loc, uint16_t val);
+uint32_t phy_id    (const struct loc *loc);
 
 void print_attr_name(const char *name, int indent);
 void print_bool(const char *name, int on);
